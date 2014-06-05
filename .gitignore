@@ -9,7 +9,7 @@
 *.DS_Store
 *.pyc
 anorak.db
-anorak.cfg
+*.cfg
 flowchart.mindnode/QuickLook/Preview.jpg
 flowchart.mindnode/contents.xml
 flowchart.mindnode/viewState.plist

@@ -2,6 +2,8 @@ CREATE TABLE animes (
     id integer primary key,
     title text,
     alternativeTitle text,
+    officialTitle text,
+    airTime text,
     subber text,
     quality integer, /* 0, 480, 720, 1080 */
     location text

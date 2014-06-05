@@ -1,4 +1,4 @@
-$def with (animes)
+$def with (animes, getAiring)
 $var title: Home
 
 <h2>Show List</h2>		
@@ -10,13 +10,15 @@ $if len(anime_list) > 0:
         <thead>
         <tr>
             <th>Anime</td>
+            <th>Next Airing</td>
             <th>Group</td>
         </tr>
         </thead>
     $for anime in anime_list:
 	    <tr>
-	        <td><a href="/anime/$anime.id">$anime.title</td>
-	            <td>$anime.subber</td>
+	        <td><a href="/anime/$anime.id">$anime.officialTitle</td>
+                <td>$:getAiring(anime)</td>
+                <td>$anime.subber</td>
 	    </tr>
 $else:
     <h3>There's nothing here. Add some shows.</h3>

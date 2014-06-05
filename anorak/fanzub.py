@@ -43,6 +43,7 @@ def search(group, anime, episode):
         items = xml.findall("channel/item")
     except Exception:
         print("Error trying to load FANZUB RSS feed")
+        return None
 
     for item in items:
         title = item.find("title").text
