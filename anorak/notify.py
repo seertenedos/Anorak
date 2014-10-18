@@ -32,7 +32,7 @@ def update_plex():
         return False
 
     for s in sections:
-        if s.getAttribute('type') == "show":
+        if s.getAttribute('type') == "show" and s.getAttribute('title') == "Anime":
             url = "%slibrary/sections/%s/refresh" % (host, s.getAttribute('key'))
             try:
                 urllib.urlopen(url)
