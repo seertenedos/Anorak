@@ -1,6 +1,10 @@
+#!/usr/bin/python
+
 import os
 import sys
 import datetime
+import time
+import pytz
 import ConfigParser
 import lib.web as web
 import lib.anidb as anidb
@@ -59,6 +63,8 @@ def setupConfig():
         settings.add_section("Plex")
         settings.set("Anorak", "port", 26463)
         settings.set("Anorak", "searchFrequency", 30)
+        settings.set("Anorak", "titleLang", "en")
+        settings.set("Anorak", "timezone", "US/Pacific")
         settings.set("SABnzbd", "url", "localhost:8080")
         settings.set("SABnzbd", "key", "")
         settings.set("SABnzbd", "category", "")
@@ -100,15 +106,20 @@ class Index:
     def GET(self):
         """ List anime """
         animes = model.get_animes()
-        return render.index(animes)
+        return render.index(animes, getAiring)
 
 class Anime:
 
-    def episodeForm(self,episode=None):
+    def episodeTryForm(self,episode=None):
         return web.form.Form(
             web.form.Hidden('episode', value=episode),
-            web.form.Hidden('form', value="episode"),
-            #web.form.Button('Try'),
+            web.form.Hidden('form', value="tryEpisode"),
+        )
+
+    def episodeSkipForm(self,episode=None):
+        return web.form.Form(
+            web.form.Hidden('episode', value=episode),
+            web.form.Hidden('form', value="skipEpisode"),
         )
 
     def editorForm(self,anime):
@@ -128,6 +139,11 @@ class Anime:
             value=anime.subber,
             description="Release Group:"),
 
+            web.form.Textbox('airTime', web.form.notnull,
+            size=30,
+            description="Enter the JST airtime of show (HH:MM)",
+            value=anime.airTime),
+
             web.form.Dropdown('quality',
             [('0', 'None'), ('720', '720p'), ('480', '480p'), ('1080', '1080p')],
             value=str(anime.quality),
@@ -143,7 +159,8 @@ class Anime:
         anime = model.get_anime(id)
         episodes = model.get_episodes(id)
         editorForm = self.editorForm(anime)
-        return render.anime(anime, episodes, self.episodeForm, editorForm)
+        return render.anime(anime, episodes, self.episodeTryForm, self.episodeSkipForm, 
+                            editorForm, search.computeAirdate)
         
     def POST(self, id):
         i = web.input()
@@ -151,6 +168,8 @@ class Anime:
         # assuming that the name of the hidden field is "form"
         if i.form == "editor":
             return self.POST_editor(id)
+        elif i.form == "skipEpisode":
+            return self.POST_skip(id)
         else:
             return self.POST_snatch(id)
 
@@ -161,18 +180,31 @@ class Anime:
         downloader.episode = web.input().episode
         if (downloader.download()):
             model.snatched_episode(id, web.input().episode)
-            return "Snatched successfully"
+            return "Snatched episode %s successfully" % web.input().episode
         else:
             return "Couldn't snatch episode %s" % web.input().episode
+
+    def POST_skip(self, id):
+        anime = model.get_anime(id)
+        ep = model.get_episode(id, web.input().episode)
+        if ep.wanted == 1:
+           model.skipped_episode(id, web.input().episode)
+           return "Skipped episode %s successfully" % web.input().episode
+        else:
+           model.wanted_episode(id, web.input().episode)
+           return "Added episode %s successfully" % web.input().episode
 
     def POST_editor(self, id):
         anime = model.get_anime(id)
         episodes = model.get_episodes(id)
         editorForm = self.editorForm(anime)
         if not editorForm.validates():
-            return render.anime(anime,episodes,self.episodeForm,editorForm)
-        model.update_anime(id, web.input().alternativeTitle, web.input().releaseGroup, web.input().location, int(web.input().quality))
-        return render.anime(anime,episodes,self.episodeForm,editorForm)
+            return render.anime(anime,episodes, self.episodeTryForm,
+                                self.episodeSkipForm, editorForm, search.computeAirdate)
+        model.update_anime(id, web.input().alternativeTitle, web.input().releaseGroup, 
+                           web.input().location, web.input().airTime, int(web.input().quality))
+        return render.anime(anime,episodes, self.episodeTryForm,
+                            self.episodeSkipForm, editorForm, search.computeAirdate)
         
 class Add:
     
@@ -188,6 +220,11 @@ class Add:
         web.form.Textbox('location', web.form.notnull,
         size=30,
         description="Enter the file path for storing episodes"),
+
+        web.form.Textbox('airTime', web.form.notnull,
+        size=30,
+        description="Enter the JST Air Time of show (HH:MM)",
+        value="00:00"),
 
         web.form.Button('Complete Add'),
     )
@@ -205,7 +242,7 @@ class Add:
         anime = anidb.query(anidb.QUERY_ANIME, int(id))
         if not form.validates():
             return render.add(form, anime)
-        metadata.newAnime(anime, form.d.subber, form.d.location, form.d.quality)
+        metadata.newAnime(anime, form.d.subber, form.d.location, form.d.airTime, form.d.quality)
         raise web.seeother('/anime/%s' % int(id))
         
 class Remove:
@@ -288,6 +325,17 @@ class Settings:
         value=str(settings.get("Anorak", "searchFrequency")),
         description="Search Frequency:"),
 
+        web.form.Dropdown('titleLang',
+        ["ar", "bg", "cs", "da", "de", "en", "es", "fa", "fi", "fr", "he", "hu", "id", 
+         "it", "ja", "ko", "lt", "nl", "no", "pl", "pt", "ro", "ru", "sv", "ta", "ur"],
+        value=str(settings.get("Anorak", "titleLang")),
+        description="Official Title Language:"),
+
+        web.form.Dropdown('timezone',
+        pytz.common_timezones,
+        value=str(settings.get("Anorak", "timezone")),
+        description="Local Timezone:"),
+
         web.form.Hidden('form', value="settings"),
 
         web.form.Button('Update'),
@@ -327,6 +375,8 @@ class Settings:
             return render.settings(self.settingsForm, self.sabnzbdForm, self.plexForm)
         settings.set("Anorak", "searchFrequency", self.settingsForm.d.searchFrequency)
         settings.set("Anorak", "port", self.settingsForm.d.port)
+        settings.set("Anorak", "timezone", self.settingsForm.d.timezone)
+        settings.set("Anorak", "titleLang", self.settingsForm.d.titleLang)
         file = open("anorak.cfg","w")
         settings.write(file)
         file.close()
@@ -362,6 +412,12 @@ class Shutdown(object):
 class NullDevice:
     def write(self, s):
         pass
+
+def getAiring(anime):
+    for episode in model.get_episodes(anime.id):
+        if episode.wanted == 1:
+            return search.computeAirdate(episode.airdate, anime.airTime).strftime("%Y-%m-%d %H:%M")
+    return "N/A"
 
 def daemonize():
     """Become a daemon"""

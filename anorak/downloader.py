@@ -22,6 +22,9 @@ class Downloader:
         #search = fanzub.search(self.anime.subber, friendlyName, self.episode)
         search = newznab.search(self.anime.subber, friendlyName, self.episode, self.anime.quality)
 
+        if search is None:
+            return false
+
         for item in search:
             #print "%s, %s" % (item.name, item.url)
             regexParser = self.regexParser.parse(item.name)

@@ -2,6 +2,7 @@ import threading
 import time
 import datetime
 import random
+from pytz import timezone
 from anorak import metadata, settings, model
 from anorak.downloader import *
 
@@ -51,6 +52,7 @@ class SearchThread(threading.Thread):
                 time.sleep(60*float(self.settings.get("Anorak", "searchFrequency")))
             except:
                 print "Something went wrong with the searching thread. Continuing anyways."
+
     def searchAnime(self, anime):
         snatched = False
         print "Searching for newly aired anime in %s\n" % (anime.title)
@@ -58,7 +60,7 @@ class SearchThread(threading.Thread):
         for episode in episodes:
             if episode.wanted == 1:
                 if episode.airdate != None:
-                    if episode.airdate < datetime.datetime.now():
+                    if self.computeAirdate(episode.airdate, anime.airTime) < datetime.datetime.now():
                         print "Attempting to snatch episode %s" % episode.episode
                         self.downloader.anime = anime
                         self.downloader.episode = episode.episode
@@ -67,3 +69,10 @@ class SearchThread(threading.Thread):
                             print "Episode was successfully snatched"
                             snatched = True
         return snatched
+
+    def computeAirdate(self, airdate, airtime):
+        """ Computes a datetime from airdate applying offset string """
+        notzAirdate = datetime.datetime.strptime(airdate.strftime("%Y-%m-%d ") + airtime, "%Y-%m-%d %H:%M")
+        jstAirdate = timezone('Asia/Tokyo').localize(notzAirdate)
+        localAirdate = jstAirdate.astimezone(timezone(settings.getSettings().get('Anorak', 'timezone')))
+        return localAirdate.replace(tzinfo=None)

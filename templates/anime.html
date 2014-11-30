@@ -1,7 +1,7 @@
-$def with (anime, episodes, episodeForm, editorForm)
+$def with (anime, episodes, episodeTryForm, episodeSkipForm, editorForm, computeAirdate)
 $var title = anime.title
 
-<h2>$anime.title</h2>
+<h2>$anime.officialTitle</h2>
 <h3>Group: $anime.subber</h3>
 
 <table border="1" width="100%">
@@ -11,7 +11,7 @@ $var title = anime.title
         <th>Title</th>
         <th>Airdate</th>
         <th>Status</th>
-        <th>Search</th>
+        <th colspan="2">Search</th>
     </tr>
     </thead>
 $for episode in episodes:
@@ -19,7 +19,7 @@ $for episode in episodes:
 		<td>$(episode.episode)</td>
 		<td>$episode.title</td>
         $if episode.airdate!=None:
-            <td>$episode.airdate.strftime("%Y-%m-%d")</td>
+            <td>$:computeAirdate(episode.airdate, anime.airTime).strftime("%Y-%m-%d %H:%M")</td>
         $else:
             <td>TBD</td>
         $if episode.wanted == 3:
@@ -28,7 +28,7 @@ $for episode in episodes:
             <td>Snatched</td>
         $if episode.wanted == 1:
             $if episode.airdate!=None:
-                $if episode.airdate > datetime.datetime.now():
+                $if computeAirdate(episode.airdate, anime.airTime) > datetime.datetime.now():
                     <td>Unaired</td>
                 $else:
                     <td>Wanted</td>
@@ -37,11 +37,21 @@ $for episode in episodes:
         $if episode.wanted == 0:
             <td>Skipped</td>
         <td>
-            <form action="" method="post">
-                $:episodeForm(episode.episode).episode.render()
-                $:episodeForm(episode.episode).form.render()
+            <form id="try$episode.episode" action="" method="post">
+                $:episodeTryForm(episode.episode).episode.render()
+                $:episodeTryForm(episode.episode).form.render()
             </form>
-            <a href="" onclick="document.forms[$episode.episode].submit();return false;">Try</a>
+            <a href="" onclick="document.getElementById('try$episode.episode').submit();return false;">Try</a>
+        </td>
+        <td>
+            <form id="skip$episode.episode" action="" method="post">
+                $:episodeSkipForm(episode.episode).episode.render()
+                $:episodeSkipForm(episode.episode).form.render()
+            </form>
+            $if episode.wanted == 1:
+                <a href="" onclick="document.getElementById('skip$episode.episode').submit();return false;">Skip</a>
+            $if episode.wanted != 1:
+                <a href="" onclick="document.getElementById('skip$episode.episode').submit();return false;">Want</a>
         </td>
 	</tr>
 </table>

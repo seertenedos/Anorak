@@ -40,7 +40,7 @@ def SABnzbd(title=None, nzburl=None):
 #    if settings.priority:
 #        params["priority"] = settings.priority
     #if settings.preprocessor:
-    params["script"] = "sabToAnorak.py"
+#    params["script"] = "sabToAnorak.py"
 
     URL = HOST + "api?" + urllib.urlencode(params) 
 
